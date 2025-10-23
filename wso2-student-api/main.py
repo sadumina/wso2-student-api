@@ -1,19 +1,24 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends, HTTPException
+from sqlmodel import Session, select
+from models import Student, Course, Enrollment
+from database import init_db, get_session
+from typing import List
 
-app = FastAPI(title="Student API", version="1.0")
+app = FastAPI(title="Academy API", version="2.0.0")
+init_db()
 
-students = [
-    {"id": 1, "name": "Ayesha", "course": "IT", "year": 3},
-    {"id": 2, "name": "Nimal", "course": "CS", "year": 2},
-    {"id": 3, "name": "Kavindu", "course": "SE", "year": 4},
-]
+# Dependency
+def get_db():
+    with get_session() as session:
+        yield session
 
-@app.get("/students")
-def get_students():
-    return students
+@app.get("/students", response_model=List[Student])
+def get_students(db: Session = Depends(get_db)):
+    return db.exec(select(Student)).all()
 
-@app.get("/students/{student_id}")
-def get_student(student_id: int):
-    student = next((s for s in students if s["id"] == student_id), None)
-    return student or {"error": "Not found"}
-
+@app.post("/students", response_model=Student)
+def add_student(student: Student, db: Session = Depends(get_db)):
+    db.add(student)
+    db.commit()
+    db.refresh(student)
+    return student
